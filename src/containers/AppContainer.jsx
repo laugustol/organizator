@@ -106,9 +106,17 @@ const UPDATE_ORDER = gql`
 const UPLOAD_FILES = gql`
   mutation uploadFiles($_id: String!, $idCard: String!, $files: [Upload]!) {
      uploadFiles(_id: $_id, idCard: $idCard, files: $files) {
-       filename
+       images
      }
-   }`;
+   }`
+
+const DELETE_FILE = gql`
+  mutation deleteFile($file: String,$key: String,$_id: String, $idCard: String) {
+    deleteFile(file: $file,key: $key,_id: $_id, idCard: $idCard) {
+      success
+    }
+  }
+`
 
 let unsubscribe = null
 function AppContainer() {
@@ -124,7 +132,8 @@ function AppContainer() {
   const [createBoard] = useMutation(CREATE_BOARD)
   const [updateCard] = useMutation(UPDATE_CARD)
   const [updateOrder] = useMutation(UPDATE_ORDER)
-  const [uploadFiles] = useMutation(UPLOAD_FILES)
+  const [uploadFiles, {error}] = useMutation(UPLOAD_FILES)
+  const [deleteFile] = useMutation(DELETE_FILE)
 
 	useEffect(async () => {
 	  //localStorage.setItem('board',JSON.stringify(board))
@@ -216,11 +225,21 @@ function AppContainer() {
 		//localStorage.setItem('board',JSON.stringify(board))
 	}
   const onDrop = useCallback(async acceptedFiles => {
-    const {data} = await uploadFiles({variables:{_id:id, idCard,files:acceptedFiles}})
-    data.uploadFiles.map(e => images.push(e.filename) )
-    setImages([...images])
+    try{
+      const {data} = await uploadFiles({variables:{_id:id, idCard,files:acceptedFiles}})
+      await data.uploadFiles.images.map(e => images.push(e) )
+      await setImages([...images])
+    }catch(e){
+      console.log(e)
+    }
   }, [id,idCard,images])
   const {getRootProps, getInputProps, isDragActive} = useDropzone({onDrop})
+
+  const deleteFileCard = async(item,key) => {
+    await deleteFile({variables:{file:item,key:key.toString(),_id:id,idCard}})
+    images.splice(key,1)
+    setImages([...images])
+  }
 
   return (
     <div style={{display:'block'}}>
@@ -279,26 +298,35 @@ function AppContainer() {
                   <p>Drop the files here ...</p> :
                   <p>Drag 'n' drop some files here, or click to select files</p>
               }
-              <List
-                grid={{
-                  gutter: 16,
-                  xs: 1,
-                  sm: 2,
-                  md: 4,
-                  lg: 4,
-                  xl: 6,
-                  xxl: 3,
-                }}
-                dataSource={images}
-                renderItem={item => (
-                  <List.Item>
-                    <Card>
-                      <img src={`${process.env.REACT_APP_URI_UPLOADS}${item}`} style={{width:'100%',height:'100%'}}/>
-                    </Card>
-                  </List.Item>
-                )}
-              />
             </div>
+            <List
+              grid={{
+                gutter: 16,
+                xs: 1,
+                sm: 2,
+                md: 4,
+                lg: 4,
+                xl: 6,
+                xxl: 3,
+              }}
+              dataSource={images}
+              renderItem={(item,key) => (
+                <List.Item>
+                  <Card>
+                    <img src={`${process.env.REACT_APP_URI_UPLOADS}${item}`} style={{width:'100%',height:'100%'}}/>
+                  </Card>
+                  <Popconfirm
+                    title={'youSureDeleteUser'}
+                    onConfirm={() => deleteFileCard(item,key)}
+                    cancelText={'cancel'}
+                    okText={'yes'}>
+                    <Tooltip placement="bottom" title={'delete'}>
+                      <Button  icon="close" block type="danger" />
+                    </Tooltip>
+                  </Popconfirm>
+                </List.Item>
+              )}
+            />
           </Form.Item>
       	</Form>
       </Modal>
